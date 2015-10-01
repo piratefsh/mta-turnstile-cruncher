@@ -49,25 +49,46 @@ def add_rows():
     return 
 
 def calc_entry_exits():
-    rows = cursor.execute('SELECT * FROM entries')
+    rows = cursor.execute('SELECT * FROM entries').fetchall()
+    count = 0
     for row in rows:
-       prev_cum_entries, = get_prev_entry_by_timeslot(row)
+        trace(count, row)
+        # debug
+        if count > 10:
+            trace('break')
+            break
+        count += 1
+
+        db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
+        res = get_prev_entry_by_timeslot(row)
+        if res is None:
+            continue
+
+        prev_cum_entries, = res
+        entries = cum_entries - prev_cum_entries 
+
+        if entries < 0: 
+            continue
+
+        update_query = 'UPDATE entries set ENTRIES=? WHERE id=?'
+        cursor.execute(update_query, (entries, db_id))
+    connection.commit()
 
 def get_prev_entry_by_timeslot(row):
     # unroll data
-    # trace(row)
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
-    # if entry/exit is not 0
+    
     trace(row)
+    
+    # if entry/exit is not 0
     if cum_entries <= 0:
         return None
 
 
     # if there is an entry previous that matches
     select = "UNIT,SCP,DATE,TIME,CUM_ENTRIES FROM entries"
-    prev = cursor.execute('SELECT %s WHERE id=? AND UNIT=? AND SCP=? AND DATE=?' % select, (str(db_id-1), unit, scp, date)).fetchone()
+    prev = cursor.execute('SELECT %s WHERE id=? AND UNIT=? AND STATION=? AND SCP=? AND DATE=?' % select, (str(db_id-1), unit, station, scp, date)).fetchone()
     if prev:
-        # then find difference and log as entry/exit
         punit, pscp, pdate, ptime, pcum_entries = prev
         return (pcum_entries,) 
         
@@ -75,7 +96,7 @@ def get_prev_entry_by_timeslot(row):
         # find last time of previous day and compare to that 
         dateformat = '%m/%d/%Y'
         yesterday = dt.datetime.strftime(dt.datetime.strptime(date, dateformat) - dt.timedelta(1), dateformat)
-        prevs = cursor.execute('SELECT %s WHERE UNIT=? AND SCP=? AND DATE=? ORDER BY TIME' % select, (unit, scp, yesterday)).fetchall()
+        prevs = cursor.execute('SELECT %s WHERE UNIT=? AND STATION=? AND SCP=? AND DATE=? ORDER BY TIME' % select, (unit, station, scp, yesterday)).fetchall()
         if len(prevs) > 0:
             prev = prevs[-1]
             punit, pscp, pdate, ptime, pcum_entries = prev
@@ -94,12 +115,14 @@ def open_db(dbname):
 # -      line with highest and lowest ridership
 
 def test():
+    # case: has previous of same day
     open_db('test/mta-turnstile-2015-sept.db')
     row = cursor.execute('SELECT * FROM entries WHERE id=?', (173178,)).fetchone()
     prev = get_prev_entry_by_timeslot(row)
-    # trace(row, prev)
     assert prev[0] == 2080793776 
-    
+   
+    # case: entries has reset to 0
+
     #id          CA          UNIT        SCP         STATION     LINENAME    DIVISION    DATE        TIME        DESC        CUM_ENTRIES  CUM_EXITS   ENTRIES     EXITS     
     #----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  -----------  ----------  ----------  ----------
     # 740286      R260        R205        01-05-01    149 ST-GR   245         IRT         09/04/2015  20:00:00    REGULAR     0            201 
@@ -107,6 +130,8 @@ def test():
     prev_0 = get_prev_entry_by_timeslot(row_entries_0)
     assert prev_0 == None
    
+    #case: has previous, but on day before
+
     #id          CA          UNIT        SCP         STATION     LINENAME    DIVISION    DATE        TIME        DESC        CUM_ENTRIES  CUM_EXITS   ENTRIES     EXITS     
     #----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  -----------  ----------  ----------  ----------
     #623536      J034        R007        00-00-03    104 ST      JZ          BMT         09/03/2015  20:00:00    REGULAR     3917798      4409278                           
@@ -116,9 +141,10 @@ def test():
     assert prev_time_00 is not None 
     assert prev_time_00[0] == 3917798
 
+    # case: no previous time 
     #774712      S101        R070        00-00-00    ST. GEORGE     1           SRT         08/29/2015  00:00:00    REGULAR     744553       137  
     row_time_00_no_prev = cursor.execute('SELECT * FROM entries WHERE id=?', (774712,)).fetchone()
     prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev)
     assert prev_time_00_none  == None
-
+    
     trace('test pass')
