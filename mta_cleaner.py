@@ -55,7 +55,6 @@ def calc_entry_exits():
         trace(count, row)
         # debug
         if count > 10:
-            trace('break')
             break
         count += 1
 
@@ -78,8 +77,6 @@ def get_prev_entry_by_timeslot(row):
     # unroll data
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
     
-    trace(row)
-    
     # if entry/exit is not 0
     if cum_entries <= 0:
         return None
@@ -100,7 +97,6 @@ def get_prev_entry_by_timeslot(row):
         if len(prevs) > 0:
             prev = prevs[-1]
             punit, pscp, pdate, ptime, pcum_entries = prev
-            trace(prev)
             return (pcum_entries,)
     return None
 
@@ -147,4 +143,10 @@ def test():
     prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev)
     assert prev_time_00_none  == None
     
+    lexave59 = cursor.execute('SELECT * FROM entries WHERE id=?', (1,)).fetchone()
+    prev_lexave59 = get_prev_entry_by_timeslot(lexave59)
+    assert prev_lexave59 is not None
+    assert prev_lexave59[0] == 5317350
+
+
     trace('test pass')
