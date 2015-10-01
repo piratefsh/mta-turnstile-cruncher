@@ -7,6 +7,7 @@ https://github.com/piratefsh/mta-turnstile-scraper
 
 import sqlite3
 from util import trace
+import datetime as dt
 
 # constants
 COLUMN_HEADERS = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATE,TIME,DESC,CUM_ENTRIES,CUM_EXITS,ENTRIES,EXITS".split(',')
@@ -50,15 +51,17 @@ def add_rows():
 def calc_entry_exits():
     rows = cursor.execute('SELECT * FROM entries')
     for row in rows:
-       get_prev_entry_by_timeslot(row)
+       prev_cum_entries, = get_prev_entry_by_timeslot(row)
 
 def get_prev_entry_by_timeslot(row):
     # unroll data
     # trace(row)
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
     # if entry/exit is not 0
+    trace(row)
     if cum_entries <= 0:
         return None
+
 
     # if there is an entry previous that matches
     select = "UNIT,SCP,DATE,TIME,CUM_ENTRIES FROM entries"
@@ -70,9 +73,13 @@ def get_prev_entry_by_timeslot(row):
         
     else:
         # find last time of previous day and compare to that 
-        prevs = cursor.execute('SELECT %s WHERE UNIT=? AND SCP=? AND DATE=? ORDER BY TIME' % select, (unit, scp, date)).fetchall()
-        if prev:
-            punit, pscp, pdate, ptime, pcum_entries = prevs[:1]
+        dateformat = '%m/%d/%Y'
+        yesterday = dt.datetime.strftime(dt.datetime.strptime(date, dateformat) - dt.timedelta(1), dateformat)
+        prevs = cursor.execute('SELECT %s WHERE UNIT=? AND SCP=? AND DATE=? ORDER BY TIME' % select, (unit, scp, yesterday)).fetchall()
+        if len(prevs) > 0:
+            prev = prevs[-1]
+            punit, pscp, pdate, ptime, pcum_entries = prev
+            trace(prev)
             return (pcum_entries,)
     return None
 
@@ -106,10 +113,12 @@ def test():
     #623537      J034        R007        00-00-03    104 ST      JZ          BMT         09/04/2015  00:00:00    REGULAR     3917827      4409360        
     row_time_00 = cursor.execute('SELECT * FROM entries WHERE id=?', (623537,)).fetchone()
     prev_time_00 = get_prev_entry_by_timeslot(row_time_00)
-    assert prev_time_00 == 3917798
+    assert prev_time_00 is not None 
+    assert prev_time_00[0] == 3917798
 
     #774712      S101        R070        00-00-00    ST. GEORGE     1           SRT         08/29/2015  00:00:00    REGULAR     744553       137  
     row_time_00_no_prev = cursor.execute('SELECT * FROM entries WHERE id=?', (774712,)).fetchone()
-    prev_time_00_none = get_prev_entry_by_timeslow(row_time_00_no_prev)
+    prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev)
     assert prev_time_00_none  == None
+
     trace('test pass')
