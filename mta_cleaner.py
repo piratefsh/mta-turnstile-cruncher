@@ -8,6 +8,7 @@ https://github.com/piratefsh/mta-turnstile-scraper
 import sqlite3
 from util import trace
 import datetime as dt
+import sys
 
 # constants
 COLUMN_HEADERS = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,CUM_ENTRIES,CUM_EXITS,ENTRIES,EXITS".split(',')
@@ -55,7 +56,7 @@ def calc_entry_exits():
 
     unique_turnstiles = cursor.execute(max_unique_turnstiles_query).fetchone()[0]
     unique_time = cursor.execute(max_unique_time_query).fetchone()[0]
-    trace(unique_turnstiles, unique_time)
+    #trace(unique_turnstiles, unique_time)
     max_offset = unique_turnstiles * unique_time
 
     rows = list(cursor.execute(select_query).fetchall())
@@ -92,7 +93,6 @@ def get_prev_entry_by_timeslot(this, others, start=0, end=None):
         start = 0
     # unroll data
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = this 
-    trace(this) 
     # if entry/exit is not 0
     if cum_entries < 0:
         return None 
@@ -141,7 +141,6 @@ def test():
     # case: entries has reset to 0
     row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (117285,)).fetchone()
     prev_0 = get_prev_entry_by_timeslot(row_entries_0, others)
-    trace(prev_0)
     assert prev_0 == (0,) 
    
     #case: has previous, but on day before
@@ -162,3 +161,8 @@ def test():
 
 
     trace('test pass')
+
+if len(sys.argv) == 2:
+    dbname = sys.argv[1]
+    open_db(dbname)
+    calc_entry_exits()
