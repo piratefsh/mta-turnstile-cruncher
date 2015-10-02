@@ -49,39 +49,49 @@ def add_rows():
     return 
 
 def calc_entry_exits():
-    rows = list(cursor.execute('SELECT * FROM entries WHERE ENTRIES IS NULL ORDER BY DATETIME').fetchall())
+    rows = list(cursor.execute('select * from entries where ENTRIES IS NULL and DATETIME IS NOT (SELECT MIN(DATETIME) from entries)').fetchall())
     counter = 0
     for row in rows:
         #trace(row)
-        counter++
-        if(counter % 1000 == 0):
+        counter += 1 
+        if(counter % 100 == 0):
             trace(counter, 'out of', len(rows))
             connection.commit()
 
         db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
-        res = get_prev_entry_by_timeslot(row, rows)
+        res = get_prev_entry_by_timeslot(row, rows, ithis=counter-1)
+    
+        #trace(res, date)
         if res is None:
             continue
 
         prev_cum_entries, = res
         entries = cum_entries - prev_cum_entries 
-
+        #trace(cum_entries, prev_cum_entries, entries)
         if entries < 0: 
             continue
 
         update_query = 'UPDATE entries set ENTRIES=? WHERE id=?'
         cursor.execute(update_query, (entries, db_id))
+        #trace(station, entries, db_id)
     connection.commit()
 
-def get_prev_entry_by_timeslot(this, others):
-    # unroll data
+def get_prev_entry_by_timeslot(this, others, ithis=None):
+    #trace('start')
+    if ithis is None:
+        ithis = len(others)
+   
+   # unroll data
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = this 
     
     # if entry/exit is not 0
     if cum_entries <= 0:
         return None
 
-    prevs = [row for row in others if is_prev_entry(this, row)]
+    prevs = [row for row in others[:ithis] if unit == row[2] and scp==row[3] and is_prev_entry(this, row)]
+    
+    #trace('end')
+
     # find previous time
     if len(prevs) > 0:
         prev = max(prevs, key=lambda x: x[7])
@@ -91,11 +101,9 @@ def get_prev_entry_by_timeslot(this, others):
 # return True if that is previous to this and is for same unit and scp
 def is_prev_entry(this, that):
     idate = 7
-    iscp = 3
-    iunit = 2
     this_date = parsedate(this[idate])
     that_date = parsedate(that[idate])
-    return that_date < this_date and that[iscp] == this[iscp] and that[iunit] == this[iunit]
+    return that_date < this_date 
 
 def parsedate(date):
     dateformat = '%Y-%m-%d %H:%M:%S' 
