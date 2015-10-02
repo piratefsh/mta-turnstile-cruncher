@@ -10,8 +10,8 @@ from util import trace
 import datetime as dt
 
 # constants
-COLUMN_HEADERS = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATE,TIME,DESC,CUM_ENTRIES,CUM_EXITS,ENTRIES,EXITS".split(',')
-COLUMN_DATATYPES = "TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,DATE,TIME,TEXT,INTEGER,INTEGER,INTEGER,INTEGER".split(',')
+COLUMN_HEADERS = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,CUM_ENTRIES,CUM_EXITS,ENTRIES,EXITS".split(',')
+COLUMN_DATATYPES = "TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,DATETIME,TIME,TEXT,INTEGER,INTEGER,INTEGER,INTEGER".split(',')
  
 # globals
 connection = None
@@ -39,8 +39,8 @@ def add_rows():
     cursor.execute(create_query)
 
     # copy contents
-    from_cols = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATE,TIME,DESC,ENTRIES,EXITS"
-    to_cols = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATE,TIME,DESC,CUM_ENTRIES,CUM_EXITS"
+    from_cols = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,ENTRIES,EXITS"
+    to_cols = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,CUM_ENTRIES,CUM_EXITS"
     copy_query = 'INSERT INTO entries(%s) SELECT %s FROM tmp_entries' % (to_cols, from_cols)
     
     cursor.execute(copy_query)
@@ -49,17 +49,17 @@ def add_rows():
     return 
 
 def calc_entry_exits():
-    rows = cursor.execute('SELECT * FROM entries').fetchall()
-    count = 0
+    rows = list(cursor.execute('SELECT * FROM entries WHERE ENTRIES IS NULL ORDER BY DATETIME').fetchall())
+    counter = 0
     for row in rows:
-        trace(count, row)
-        # debug
-        if count > 10:
-            break
-        count += 1
+        #trace(row)
+        counter++
+        if(counter % 1000 == 0):
+            trace(counter, 'out of', len(rows))
+            connection.commit()
 
         db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
-        res = get_prev_entry_by_timeslot(row)
+        res = get_prev_entry_by_timeslot(row, rows)
         if res is None:
             continue
 
@@ -73,32 +73,33 @@ def calc_entry_exits():
         cursor.execute(update_query, (entries, db_id))
     connection.commit()
 
-def get_prev_entry_by_timeslot(row):
+def get_prev_entry_by_timeslot(this, others):
     # unroll data
-    db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
+    db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = this 
     
     # if entry/exit is not 0
     if cum_entries <= 0:
         return None
 
-
-    # if there is an entry previous that matches
-    select = "UNIT,SCP,DATE,TIME,CUM_ENTRIES FROM entries"
-    prev = cursor.execute('SELECT %s WHERE id=? AND UNIT=? AND STATION=? AND SCP=? AND DATE=?' % select, (str(db_id-1), unit, station, scp, date)).fetchone()
-    if prev:
-        punit, pscp, pdate, ptime, pcum_entries = prev
-        return (pcum_entries,) 
-        
-    else:
-        # find last time of previous day and compare to that 
-        dateformat = '%m/%d/%Y'
-        yesterday = dt.datetime.strftime(dt.datetime.strptime(date, dateformat) - dt.timedelta(1), dateformat)
-        prevs = cursor.execute('SELECT %s WHERE UNIT=? AND STATION=? AND SCP=? AND DATE=? ORDER BY TIME' % select, (unit, station, scp, yesterday)).fetchall()
-        if len(prevs) > 0:
-            prev = prevs[-1]
-            punit, pscp, pdate, ptime, pcum_entries = prev
-            return (pcum_entries,)
+    prevs = [row for row in others if is_prev_entry(this, row)]
+    # find previous time
+    if len(prevs) > 0:
+        prev = max(prevs, key=lambda x: x[7])
+        return (prev[10],)
     return None
+
+# return True if that is previous to this and is for same unit and scp
+def is_prev_entry(this, that):
+    idate = 7
+    iscp = 3
+    iunit = 2
+    this_date = parsedate(this[idate])
+    that_date = parsedate(that[idate])
+    return that_date < this_date and that[iscp] == this[iscp] and that[iunit] == this[iunit]
+
+def parsedate(date):
+    dateformat = '%Y-%m-%d %H:%M:%S' 
+    return dt.datetime.strptime(date, dateformat)
 
 def open_db(dbname):
    global connection, cursor
@@ -112,41 +113,32 @@ def open_db(dbname):
 
 def test():
     # case: has previous of same day
-    open_db('test/mta-turnstile-2015-sept.db')
+    open_db('test/testsept.db')
     row = cursor.execute('SELECT * FROM entries WHERE id=?', (173178,)).fetchone()
-    prev = get_prev_entry_by_timeslot(row)
+    others = list(cursor.execute('SELECT * FROM entries').fetchall())
+    prev = get_prev_entry_by_timeslot(row, others)
     assert prev[0] == 2080793776 
    
     # case: entries has reset to 0
-
-    #id          CA          UNIT        SCP         STATION     LINENAME    DIVISION    DATE        TIME        DESC        CUM_ENTRIES  CUM_EXITS   ENTRIES     EXITS     
-    #----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  -----------  ----------  ----------  ----------
-    # 740286      R260        R205        01-05-01    149 ST-GR   245         IRT         09/04/2015  20:00:00    REGULAR     0            201 
-    row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (740286,)).fetchone()
-    prev_0 = get_prev_entry_by_timeslot(row_entries_0)
+    row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (451,)).fetchone()
+    prev_0 = get_prev_entry_by_timeslot(row_entries_0, others)
     assert prev_0 == None
    
     #case: has previous, but on day before
-
-    #id          CA          UNIT        SCP         STATION     LINENAME    DIVISION    DATE        TIME        DESC        CUM_ENTRIES  CUM_EXITS   ENTRIES     EXITS     
-    #----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  ----------  -----------  ----------  ----------  ----------
-    #623536      J034        R007        00-00-03    104 ST      JZ          BMT         09/03/2015  20:00:00    REGULAR     3917798      4409278                           
-    #623537      J034        R007        00-00-03    104 ST      JZ          BMT         09/04/2015  00:00:00    REGULAR     3917827      4409360        
-    row_time_00 = cursor.execute('SELECT * FROM entries WHERE id=?', (623537,)).fetchone()
-    prev_time_00 = get_prev_entry_by_timeslot(row_time_00)
+    row_time_00 = cursor.execute('SELECT * FROM entries WHERE id=?', (7,)).fetchone()
+    prev_time_00 = get_prev_entry_by_timeslot(row_time_00, others)
     assert prev_time_00 is not None 
-    assert prev_time_00[0] == 3917798
+    assert prev_time_00[0] == 5318468 
 
     # case: no previous time 
-    #774712      S101        R070        00-00-00    ST. GEORGE     1           SRT         08/29/2015  00:00:00    REGULAR     744553       137  
-    row_time_00_no_prev = cursor.execute('SELECT * FROM entries WHERE id=?', (774712,)).fetchone()
-    prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev)
+    row_time_00_no_prev = cursor.execute('SELECT * FROM entries WHERE id=?', (30385,)).fetchone()
+    prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev, others)
     assert prev_time_00_none  == None
     
-    lexave59 = cursor.execute('SELECT * FROM entries WHERE id=?', (1,)).fetchone()
-    prev_lexave59 = get_prev_entry_by_timeslot(lexave59)
+    lexave59 = cursor.execute('SELECT * FROM entries WHERE id=?', (2,)).fetchone()
+    prev_lexave59 = get_prev_entry_by_timeslot(lexave59, others)
     assert prev_lexave59 is not None
-    assert prev_lexave59[0] == 5317350
+    assert prev_lexave59[0] == 5317608 
 
 
     trace('test pass')
