@@ -72,7 +72,10 @@ def calc_entry_exits():
         
         db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
         res = get_prev_entry_by_timeslot(row, rows, start=counter-max_offset-1, end=counter-1)
-    
+     
+        if res is None:
+            continue
+
         prev_cum_entries, = res
         entries = cum_entries - prev_cum_entries 
         #trace(cum_entries, prev_cum_entries, entries)
