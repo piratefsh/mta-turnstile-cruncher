@@ -49,54 +49,65 @@ def add_rows():
     return 
 
 def calc_entry_exits():
-    rows = list(cursor.execute('select * from entries where ENTRIES IS NULL and DATETIME IS NOT (SELECT MIN(DATETIME) from entries)').fetchall())
+    select_query = 'select * from entries order by STATION, DATETIME ASC'
+    max_unique_turnstiles_query = 'select max(y.num) from (select count(distinct SCP) as num from entries GROUP BY UNIT)y'
+    max_unique_time_query = 'select max(y.num) from (select count(distinct TIME) as num from entries GROUP BY UNIT)y'
+
+    unique_turnstiles = cursor.execute(max_unique_turnstiles_query).fetchone()[0]
+    unique_time = cursor.execute(max_unique_time_query).fetchone()[0]
+    trace(unique_turnstiles, unique_time)
+    max_offset = unique_turnstiles * unique_time
+
+    rows = list(cursor.execute(select_query).fetchall())
     counter = 0
-    for row in rows:
+    while counter < len(rows):
+        row = rows[counter]
+
         #trace(row)
         counter += 1 
         if(counter % 100 == 0):
             trace(counter, 'out of', len(rows))
             connection.commit()
-
+        
         db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = row
-        res = get_prev_entry_by_timeslot(row, rows, ithis=counter-1)
+        res = get_prev_entry_by_timeslot(row, rows, start=counter-max_offset-1, end=counter-1)
     
-        #trace(res, date)
-        if res is None:
-            continue
-
         prev_cum_entries, = res
         entries = cum_entries - prev_cum_entries 
         #trace(cum_entries, prev_cum_entries, entries)
-        if entries < 0: 
+        if entries < 0:
             continue
 
         update_query = 'UPDATE entries set ENTRIES=? WHERE id=?'
         cursor.execute(update_query, (entries, db_id))
         #trace(station, entries, db_id)
+        
     connection.commit()
 
-def get_prev_entry_by_timeslot(this, others, ithis=None):
-    #trace('start')
-    if ithis is None:
-        ithis = len(others)
-   
-   # unroll data
+def get_prev_entry_by_timeslot(this, others, start=0, end=None):
+    # ithis is index of this, or where to stop searching
+    if end is None:
+        end = len(others)
+    if start < 0:
+        start = 0
+    # unroll data
     db_id, ca, unit, scp, station, line, _, date, time, _, cum_entries, cum_exits, _, _ = this 
-    
+    trace(this) 
     # if entry/exit is not 0
-    if cum_entries <= 0:
-        return None
+    if cum_entries < 0:
+        return None 
+    if cum_entries == 0:
+        return (0,)
 
-    prevs = [row for row in others[:ithis] if unit == row[2] and scp==row[3] and is_prev_entry(this, row)]
+    prevs = [row for row in others[start:end] 
+                if unit == row[2] and scp==row[3] 
+                    and is_prev_entry(this, row)]
     
-    #trace('end')
-
     # find previous time
     if len(prevs) > 0:
         prev = max(prevs, key=lambda x: x[7])
         return (prev[10],)
-    return None
+    return None # no previous time 
 
 # return True if that is previous to this and is for same unit and scp
 def is_prev_entry(this, that):
@@ -128,9 +139,10 @@ def test():
     assert prev[0] == 2080793776 
    
     # case: entries has reset to 0
-    row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (451,)).fetchone()
+    row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (117285,)).fetchone()
     prev_0 = get_prev_entry_by_timeslot(row_entries_0, others)
-    assert prev_0 == None
+    trace(prev_0)
+    assert prev_0 == (0,) 
    
     #case: has previous, but on day before
     row_time_00 = cursor.execute('SELECT * FROM entries WHERE id=?', (7,)).fetchone()
@@ -141,7 +153,7 @@ def test():
     # case: no previous time 
     row_time_00_no_prev = cursor.execute('SELECT * FROM entries WHERE id=?', (30385,)).fetchone()
     prev_time_00_none = get_prev_entry_by_timeslot(row_time_00_no_prev, others)
-    assert prev_time_00_none  == None
+    assert prev_time_00_none  == None 
     
     lexave59 = cursor.execute('SELECT * FROM entries WHERE id=?', (2,)).fetchone()
     prev_lexave59 = get_prev_entry_by_timeslot(lexave59, others)
