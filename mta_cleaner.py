@@ -76,14 +76,17 @@ def calc_entry_exits():
         if res is None:
             continue
 
-        prev_cum_entries, = res
+        prev_cum_entries, prev_cum_exits = res
         entries = cum_entries - prev_cum_entries 
+        exits = cum_exits - prev_cum_exits 
         #trace(cum_entries, prev_cum_entries, entries)
         if entries < 0:
-            continue
+            entries = None
+        if exits < 0:
+            exits = None
 
-        update_query = 'UPDATE entries set ENTRIES=? WHERE id=?'
-        cursor.execute(update_query, (entries, db_id))
+        update_query = 'UPDATE entries set ENTRIES=?,EXITS=? WHERE id=?'
+        cursor.execute(update_query, (entries, exits, db_id))
         #trace(station, entries, db_id)
         
     connection.commit()
@@ -99,8 +102,8 @@ def get_prev_entry_by_timeslot(this, others, start=0, end=None):
     # if entry/exit is not 0
     if cum_entries < 0:
         return None 
-    if cum_entries == 0:
-        return (0,)
+    if cum_entries == 0 and cum_exits == 0:
+        return (0,0)
 
     prevs = [row for row in others[start:end] 
                 if unit == row[2] and scp==row[3] 
@@ -109,7 +112,7 @@ def get_prev_entry_by_timeslot(this, others, start=0, end=None):
     # find previous time
     if len(prevs) > 0:
         prev = max(prevs, key=lambda x: x[7])
-        return (prev[10],)
+        return (prev[10],prev[11])
     return None # no previous time 
 
 # return True if that is previous to this and is for same unit and scp
@@ -144,7 +147,7 @@ def test():
     # case: entries has reset to 0
     row_entries_0 = cursor.execute('SELECT * FROM entries WHERE id=?', (117285,)).fetchone()
     prev_0 = get_prev_entry_by_timeslot(row_entries_0, others)
-    assert prev_0 == (0,) 
+    assert prev_0[0] == 0 
    
     #case: has previous, but on day before
     row_time_00 = cursor.execute('SELECT * FROM entries WHERE id=?', (7,)).fetchone()
