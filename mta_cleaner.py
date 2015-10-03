@@ -107,11 +107,11 @@ def crunch_turnstile_rows(rows):
 
 def remove_outliers(rows):
     global index_entries, index_exits
-    count = 0
+    outliers = []
 
     for row in rows:
-        en = row[index_entries]
-        ex = row[index_exits]
+        en = row[index_entries] if row[index_entries] is not None else 0
+        ex = row[index_exits] if row[index_exits] is not None else 0
 
         # find mean and std deviation
         mean_centries, std_centries = get_mean_and_std(rows, index_entries)
@@ -123,31 +123,29 @@ def remove_outliers(rows):
 
         # discard outliers
         if outlier_entry or outlier_exits:
+            outliers.append(row)
             if outlier_entry:
                 en = None
 
             if outlier_exits:
                 ex = None
-
-            #update_entry_exit(row, diff_entry, diff_exit)
-            count += 1
-
-    return count
+            update_entry_exit(row, en, ex)
+    return outliers
 
 
 def is_outlier(mean, std, val):
-    magnitude = 3
-    return abs(mean - val) > std*3
+    magnitude = 5
+    return abs(mean - val) > std*magnitude
 
 
 def get_mean_and_std(rows, i):
-    data = [r[i] for r in rows]
+    data = [r[i] if r[i] is not None else 0 for r in rows]
     return (np.mean(data), np.std(data))
 
 
 def update_entry_exit(row, entry, exit):
-    entry = 0 if entry < 0 else entry
-    exit = 0 if exit < 0 else exit
+    entry = 0 if entry is not None and entry < 0 else entry
+    exit = 0 if exit is not None and exit < 0 else exit
 
     query = 'update entries set ENTRIES=?, EXITS=? where id=?'
     params = (entry, exit, row[0])
@@ -206,24 +204,48 @@ def test_std_dev():
     dataset = eval(data)
 
     removed = remove_outliers(dataset)
-    trace(removed)
+    assert removed == 1
+    trace('tests pass')
 
 def main():
-    if len(sys.argv) != 2:
-        print('Usage: python mta_cleaner <db_path>')
+    numargs = len(sys.argv) 
+    if numargs < 2 or numargs > 3 :
+        print('Usage: python mta_cleaner <db_path> <optional: clean>')
         return
 
     open_db(sys.argv[1])
-    add_columns()
+ 
+    if numargs == 2:
+        add_columns()
 
-    turnstiles = get_turnstiles()
+        turnstiles = get_turnstiles()
 
-    count = 0
-    for ts in turnstiles:
-        rows = per_turnstile(ts)
-        crunch_turnstile_rows(rows)
-        count += 1
-        if count % 100 == 0:
-            trace(dt.datetime.now(), count, 'of', len(turnstiles))
+        count = 0
+        for ts in turnstiles:
+            rows = per_turnstile(ts)
+            crunch_turnstile_rows(rows)
+            count += 1
+            if count % 100 == 0:
+                trace(dt.datetime.now(), count, 'of', len(turnstiles))
+
+    if numargs == 3 and sys.argv[2] == 'clean':
+        turnstiles = get_turnstiles()
+        trace('removing outliers')
+        count = 0
+        count_ts = 0
+        for ts in turnstiles:
+            rows = per_turnstile(ts)
+            removed = remove_outliers(rows)
+            if len(removed) > 0:
+                scp, unit = ts
+                one = removed[0]
+                trace('Removed %d outliers from turnstile (%s, %s), station %s, id %d, %d %d' % (len(removed),scp, unit, one[4], one[0], one[index_entries], one[index_exits]))
+                
+                count += 1
+            count_ts += 1
+            if(count_ts % 100 == 0):
+                trace(dt.datetime.now(), 'Turnstile %d of %d' % (count_ts, len(turnstiles)))
+
+        trace(dt.datetime.now(), 'removed %d points' % count)
 
 main()
