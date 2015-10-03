@@ -30,10 +30,20 @@ id|CA|UNIT|SCP|STATION|LINENAME|DIVISION|DATETIME|TIME|DESC|CUM_ENTRIES|CUM_EXIT
 
 ## Stuff I found out from the cleaned data
 
+This is pulled from Sept 2015 data only, so just a relatively small dataset.
+
 ### Find total by turnstile
 
 ```
-select ID,SCP, UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries group by SCP,UNIT) ts order by STATION;
+> select ID,SCP, UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries group by SCP,UNIT) ts order by STATION;
+
+ID     SCP                   UNIT             STATION               TOTAL_ENTRIES       
+-----  --------------------  ---------------  --------------------  --------------------
+61465  00-00-00              R248             1 AVE                 1760756258          
+61469  00-00-01              R248             1 AVE                 9453993464          
+61474  00-03-00              R248             1 AVE                 64263001841         
+61478  00-03-01              R248             1 AVE                 242602166           
+61482  00-03-02              R248             1 AVE                 835454095  
 ```
 
 ### Find total for one station
@@ -47,9 +57,9 @@ ID          UNIT        STATION         TOTAL_ENTRIES
 ```
 
 ### Find total by station
+Top 10 most popular stations for Sept 2015
 
 ```
-# top 10 entries
 > select ID,UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *, SUM(ENTRIES) as TOTAL_ENT from entries group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
 
 ID          UNIT        STATION          TOTAL_ENTRIES
@@ -64,6 +74,25 @@ ID          UNIT        STATION          TOTAL_ENTRIES
 726965      R044        BROOKLYN BRIDGE  509834714918 
 773955      R110        FLATBUSH AVE     496945235519 
 716443      R452        72 ST            494767882795 
+```
+
+### Top 10 Stations on the 1 line
+
+42nd st wins by a huge margin. Not sure how different 42 ST- PA BUS is from 42 ST- TIMES SQ. Considering consolidating them.
+
+```
+UNIT   STATION               LINENAME         TOTAL_ENTRIES         TOTAL_EXITS         
+-----  --------------------  ---------------  --------------------  --------------------
+R011   42 ST-PA BUS TE       ACENQRS1237      1305321095061         1081126711150       
+R084   59 ST-COLUMBUS        1ABCD            739883225413          831063966543        
+R033   42 ST-TIMES SQ        1237ACENQRS      656792232455          557500129028        
+R452   72 ST                 123              494767882795          508487245256        
+R030   CHAMBERS ST           123              370271058038          301423176298        
+R189   CHRISTOPHER ST        1                324555783669          124844059824        
+R032   42 ST-TIMES SQ        1237ACENQRS      307422996628          209265663917        
+R105   14 ST                 123FLM           261594676265          278697159428        
+R273   145 ST                1                233237206989          341520515582        
+R159   116 ST-COLUMBIA       1                213720615638          45114157693
 ```
 
 ### Stations on the G line, in order of decresing popularity
