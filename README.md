@@ -32,32 +32,10 @@ id|CA|UNIT|SCP|STATION|LINENAME|DIVISION|DATETIME|TIME|DESC|CUM_ENTRIES|CUM_EXIT
 
 This is pulled from Sept 2015 data only, so just a relatively small dataset.
 
-### Find total by turnstile
 
-```
-> select ID,SCP, UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries group by SCP,UNIT) ts order by STATION;
+###Top 10 most popular stations for Sept 2015
 
-ID     SCP                   UNIT             STATION               TOTAL_ENTRIES       
------  --------------------  ---------------  --------------------  --------------------
-61465  00-00-00              R248             1 AVE                 1760756258          
-61469  00-00-01              R248             1 AVE                 9453993464          
-61474  00-03-00              R248             1 AVE                 64263001841         
-61478  00-03-01              R248             1 AVE                 242602166           
-61482  00-03-02              R248             1 AVE                 835454095  
-```
-
-### Find total for one station
-
-```
-> select ID,UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries WHERE STATION='14 ST-UNION SQ' group by UNIT) ts;
-
-ID          UNIT        STATION         TOTAL_ENTRIES
-----------  ----------  --------------  -------------
-728605      R170        14 ST-UNION SQ  225106428089 
-```
-
-### Find total by station
-Top 10 most popular stations for Sept 2015
+Query finds total by station and sorts by `TOTAL_ENTRIES`
 
 ```
 > select ID,UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *, SUM(ENTRIES) as TOTAL_ENT from entries group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
@@ -127,6 +105,31 @@ R270   SMITH-9 ST  FG        1704099310            1274924271
 R316   FLUSHING A  G         1180127765            1159380049          
 R360   VAN ALSTON  G         919771530             1042047252
 ```
+
+### Find total by turnstile
+
+```
+> select ID,SCP, UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries group by SCP,UNIT) ts order by STATION;
+
+ID     SCP                   UNIT             STATION               TOTAL_ENTRIES       
+-----  --------------------  ---------------  --------------------  --------------------
+61465  00-00-00              R248             1 AVE                 1760756258          
+61469  00-00-01              R248             1 AVE                 9453993464          
+61474  00-03-00              R248             1 AVE                 64263001841         
+61478  00-03-01              R248             1 AVE                 242602166           
+61482  00-03-02              R248             1 AVE                 835454095  
+```
+
+### Find total for one station
+
+```
+> select ID,UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *,SUM(ENTRIES) as TOTAL_ENT from entries WHERE STATION='14 ST-UNION SQ' group by UNIT) ts;
+
+ID          UNIT        STATION         TOTAL_ENTRIES
+----------  ----------  --------------  -------------
+728605      R170        14 ST-UNION SQ  225106428089 
+```
+
 
 ## Other Resources
 * [MTA Facts and Figures](http://web.mta.info/nyct/facts/ffsubway.htm)
