@@ -64,24 +64,29 @@ def add_columns():
 
 # get all unique turnstiles, ordered by datetime
 
-
 def get_turnstiles():
     get_u_turnstile_query = "select SCP, UNIT" + \
         " from entries group by SCP, UNIT order by UNIT"
     turnstiles = cursor.execute(get_u_turnstile_query).fetchall()
     return turnstiles
 
-# for each unique turnstile, find previous entry
-
+def get_stations():
+    get_u_station_query = "select UNIT" + \
+        " from entries group by UNIT order by UNIT"
+    stations = cursor.execute(get_u_station_query).fetchall()
+    return stations
 
 def per_turnstile(ts):
-    scp, unit = ts
     get_rows_for_ts_query = "select * from entries" + \
         " where SCP=? AND UNIT=? order by DATETIME"
     rows = cursor.execute(get_rows_for_ts_query, ts).fetchall()
-
     return rows
 
+def per_station(st):
+    get_rows_for_ts_query = "select * from entries" + \
+        " where UNIT=? order by DATETIME"
+    rows = cursor.execute(get_rows_for_ts_query, st).fetchall()
+    return rows
 
 def crunch_turnstile_rows(rows):
     global index_cum_entries, index_cum_exits
@@ -130,11 +135,12 @@ def remove_outliers(rows):
             if outlier_exits:
                 ex = None
             update_entry_exit(row, en, ex)
+    connection.commit()
     return outliers
 
 
 def is_outlier(mean, std, val):
-    magnitude = 5
+    magnitude = 8
     return abs(mean - val) > std*magnitude
 
 
@@ -176,10 +182,15 @@ def open_db(dbname):
 
 
 def test():
-    open_db('test/testsept.db')
+    open_db('db/mta-2015-09-12.db')
     turnstiles = get_turnstiles()
-    assert len(turnstiles) == 4576
+    assert len(turnstiles) == 4579
 
+    stations = get_stations()
+    assert len(stations) == 465
+
+    rows = per_station(stations[0])
+    assert len(rows) > 0
     trace('tests pass')
 
 
@@ -207,6 +218,27 @@ def test_std_dev():
     assert removed == 1
     trace('tests pass')
 
+def remove_outliers_by(things, per_thing):
+    trace('Removing outliers...')
+    count = 0
+    count_thing = 0
+    for ts in things:
+        rows = per_thing(ts)
+        removed = remove_outliers(rows)
+
+        if len(removed) > 0:
+            one = removed[0]
+            trace('Removed %d outliers from %s, station %s, id %d, %d %d' % (len(removed), str(ts), one[4], one[0], int(one[index_entries] or 0), int(one[index_exits] or 0)))
+            
+            count += 1
+        count_thing += 1
+
+        if(count_thing % 100 == 0):
+            trace(dt.datetime.now(), 'Thing %d of %d' % (count_thing, len(things)))
+
+    trace(dt.datetime.now(), 'Done. Removed %d points' % count)
+    connection.commit()
+
 def main():
     numargs = len(sys.argv) 
     if numargs < 2 or numargs > 3 :
@@ -230,22 +262,8 @@ def main():
 
     if numargs == 3 and sys.argv[2] == 'clean':
         turnstiles = get_turnstiles()
-        trace('removing outliers')
-        count = 0
-        count_ts = 0
-        for ts in turnstiles:
-            rows = per_turnstile(ts)
-            removed = remove_outliers(rows)
-            if len(removed) > 0:
-                scp, unit = ts
-                one = removed[0]
-                trace('Removed %d outliers from turnstile (%s, %s), station %s, id %d, %d %d' % (len(removed),scp, unit, one[4], one[0], one[index_entries], one[index_exits]))
-                
-                count += 1
-            count_ts += 1
-            if(count_ts % 100 == 0):
-                trace(dt.datetime.now(), 'Turnstile %d of %d' % (count_ts, len(turnstiles)))
-
-        trace(dt.datetime.now(), 'removed %d points' % count)
-
+        remove_outliers_by(turnstiles, per_turnstile)
+        # stations = get_stations()
+        # remove_outliers_by(stations, per_station)
+        
 main()
