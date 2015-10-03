@@ -14,6 +14,40 @@ import sys
 connection = None
 cursor = None
 
+COLUMN_HEADERS      = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,CUM_ENTRIES,CUM_EXITS,ENTRIES,EXITS".split(',') 
+COLUMN_DATATYPES    = "TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,DATETIME,TIME,TEXT,INTEGER,INTEGER,INTEGER,INTEGER".split(',')
+
+# rename ENTRIES and EXITS columns to CUM_ENTRIES and CUM_EXITS
+def add_columns():
+    # get column headers and datatypes
+    headers = cursor.execute('pragma table_info("entries")').fetchall()
+    header_datatype = ",".join([name + ',' + datatype for _, name, datatype, _, _, _ in headers])
+    
+    # rename old table
+    # check if table exists
+    tables = cursor.execute('select name from sqlite_master where type="table"').fetchall()
+    if ('entries',) in tables:
+        cursor.execute('ALTER TABLE entries RENAME TO tmp_entries')
+    
+    # create new table with correct columns
+    header_and_datatypes = "id INTEGER PRIMARY KEY AUTOINCREMENT,  " + ", ".join([COLUMN_HEADERS[i] + ' ' + COLUMN_DATATYPES[i] for i in range(len(COLUMN_HEADERS))])
+    create_query = 'CREATE TABLE entries (%s)' % header_and_datatypes
+    cursor.execute(create_query)
+
+    # copy contents
+    same_cols   = "CA,UNIT,SCP,STATION,LINENAME,DIVISION,DATETIME,TIME,DESC,"
+    from_cols   = same_cols + "ENTRIES,EXITS"
+    to_cols     = same_cols + "CUM_ENTRIES,CUM_EXITS"
+    copy_query  = 'INSERT INTO entries(%s) SELECT %s FROM tmp_entries' % (to_cols, from_cols)
+    
+    cursor.execute(copy_query)
+
+    # delete temp table
+    cursor.execute('drop table tmp_entries')
+
+    connection.commit()
+    return 
+
 # get all unique turnstiles, ordered by datetime
 def get_turnstiles():
     get_u_turnstile_query = "select SCP, UNIT" + \
@@ -90,6 +124,8 @@ def main():
         return
 
     open_db(sys.argv[1])
+    add_columns()
+
     turnstiles = get_turnstiles()
     
     count = 0
