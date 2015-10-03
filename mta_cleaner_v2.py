@@ -82,7 +82,6 @@ def test():
     turnstiles = get_turnstiles()
     assert len(turnstiles) == 4576
 
-    count = 0
     trace('tests pass')
 
 def main():
@@ -92,6 +91,8 @@ def main():
 
     open_db(sys.argv[1])
     turnstiles = get_turnstiles()
+    
+    count = 0
     for ts in turnstiles:
         rows = per_turnstile(ts)
         crunch_turnstile_rows(rows)
