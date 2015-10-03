@@ -4,9 +4,9 @@
 ## What this does
 From a database generated from the [mta-turnstile-scraper](https://github.com/piratefsh/mta-turnstile-scraper), find the entries and exits for each row. 
 
-Converts columns ENTRIES to CUM_ENTRIES and EXITS to CUM_EXITS. Updates calculated entries and exits in ENTRIES and EXITS columns respectively.
+Converts columns `ENTRIES` to `CUM_ENTRIES` and `EXITS` to `CUM_EXITS`. Updates calculated entries and exits in `ENTRIES` and `EXITS` columns respectively.
 
-Raw data only has cumulative numbers per row, so some math and massaging was needed to get the exact numbers at each logged time slot. Does it by finding all entries per unique turnstile and subtracting the CUM_ENTRIES from a previous entry. Also ignores negative entries/exits and entries with no previous CUM_ENTRIES/CUM_EXITS.
+Raw data only has cumulative numbers per row, so some math and massaging was needed to get the exact numbers at each logged time slot. Does it by finding all entries per unique turnstile and subtracting the `CUM_ENTRIES` from a previous entry. Also ignores negative entries/exits and entries with no previous `CUM_ENTRIES/CUM_EXITS`.
 
 ## Usage
 
