@@ -1,11 +1,32 @@
 # MTA Turnstile Data Cleaner
 
+
 ## What this does
 From a database generated from the [mta-turnstile-scraper](https://github.com/piratefsh/mta-turnstile-scraper), find the entries and exits for each row. 
 
 Converts columns ENTRIES to CUM_ENTRIES and EXITS to CUM_EXITS. Updates calculated entries and exits in ENTRIES and EXITS columns respectively.
 
-Raw data only has cumulative numbers per row, so some math and massaging was needed to get the exact numbers at each logged time slot. Does it by finding all entries per unique turnstile and subtracting the CUM_ENTRIES from a previous entry. Also ignores negative entries/exits and resets to 0.
+Raw data only has cumulative numbers per row, so some math and massaging was needed to get the exact numbers at each logged time slot. Does it by finding all entries per unique turnstile and subtracting the CUM_ENTRIES from a previous entry. Also ignores negative entries/exits and entries with no previous CUM_ENTRIES/CUM_EXITS.
+
+## Usage
+
+### Input
+
+```
+$ python mta_cleaner.py <path to db of data>
+```
+
+### Output
+
+```
+id|CA|UNIT|SCP|STATION|LINENAME|DIVISION|DATETIME|TIME|DESC|CUM_ENTRIES|CUM_EXITS|ENTRIES|EXITS
+1|A002|R051|02-00-00|LEXINGTON AVE|NQR456|BMT|2015-09-19 00:00:00|00:00:00|REGULAR|5317608|1797091||
+2|A002|R051|02-00-00|LEXINGTON AVE|NQR456|BMT|2015-09-19 04:00:00|04:00:00|REGULAR|5317644|1797096|36|5
+3|A002|R051|02-00-00|LEXINGTON AVE|NQR456|BMT|2015-09-19 08:00:00|08:00:00|REGULAR|5317675|1797116|31|20
+4|A002|R051|02-00-00|LEXINGTON AVE|NQR456|BMT|2015-09-19 12:00:00|12:00:00|REGULAR|5317778|1797215|103|99
+5|A002|R051|02-00-00|LEXINGTON AVE|NQR456|BMT|2015-09-19 16:00:00|16:00:00|REGULAR|5318058|1797266|280|51
+```
+
 
 ## Stuff I found out from the cleaned data
 
