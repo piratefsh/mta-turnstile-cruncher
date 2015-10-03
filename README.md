@@ -38,20 +38,20 @@ This is pulled from Sept 2015 data only, so just a relatively small dataset.
 Query finds total by station and sorts by `TOTAL_ENTRIES`
 
 ```
-> select ID,UNIT, STATION, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *, SUM(ENTRIES) as TOTAL_ENT from entries group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
+> select ID, UNIT, STATION, LINENAME, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *, SUM(ENTRIES) as TOTAL_ENT from entries group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
 
-ID          UNIT        STATION          TOTAL_ENTRIES
-----------  ----------  ---------------  -------------
-635141      R011        42 ST-PA BUS TE  1305321095061
-586808      R080        57 ST-7 AVE      1288256345231
-714660      R084        59 ST-COLUMBUS   739883225413 
-713284      R033        42 ST-TIMES SQ   656792232455 
-705651      R028        FULTON ST        563220526064 
-680062      R453        23 ST-6 AVE      521178110228 
-729663      R131        23 ST            517934378933 
-726965      R044        BROOKLYN BRIDGE  509834714918 
-773955      R110        FLATBUSH AVE     496945235519 
-716443      R452        72 ST            494767882795 
+ID     UNIT                  STATION          LINENAME              TOTAL_ENTRIES       
+-----  --------------------  ---------------  --------------------  --------------------
+63514  R011                  42 ST-PA BUS TE  ACENQRS1237           1305321095061       
+58680  R080                  57 ST-7 AVE      NQR                   1288256345231       
+71466  R084                  59 ST-COLUMBUS   1ABCD                 739883225413        
+71328  R033                  42 ST-TIMES SQ   1237ACENQRS           656792232455        
+70565  R028                  FULTON ST        2345ACJZ              563220526064        
+68006  R453                  23 ST-6 AVE      FM                    521178110228        
+72966  R131                  23 ST            6                     517934378933        
+72696  R044                  BROOKLYN BRIDGE  456JZ                 509834714918        
+77395  R110                  FLATBUSH AVE     25                    496945235519        
+71644  R452                  72 ST            123                   494767882795  
 ```
 
 ### Top 10 Stations on the 1 line
