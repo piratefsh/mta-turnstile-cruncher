@@ -98,6 +98,6 @@ def main():
         crunch_turnstile_rows(rows)
         count += 1 
         if count % 100 == 0:
-            trace(count, 'of', len(turnstiles))
+            trace(dt.datetime.now(), count, 'of', len(turnstiles))
 
 main()
