@@ -13,7 +13,11 @@ Raw data only has cumulative numbers per row, so some math and massaging was nee
 ### Input
 
 ```
+# first run
 $ python mta_cleaner.py <path to db of data>
+
+# then run to remove outliers only
+$ python mta_cleaner.py <path to db of data> clean 
 ```
 
 ### Output
@@ -33,44 +37,48 @@ id|CA|UNIT|SCP|STATION|LINENAME|DIVISION|DATETIME|TIME|DESC|CUM_ENTRIES|CUM_EXIT
 This is pulled from Sept 2015 data only, so just a relatively small dataset.
 
 
-###Top 10 most popular stations for Sept 2015
+###Top 10 most popular stations for a week in Sept 2015
 
 Query finds total by station and sorts by `TOTAL_ENTRIES`
 
 ```
 > select ID, UNIT, STATION, LINENAME, ts.TOTAL_ENT as TOTAL_ENTRIES from (select *, SUM(ENTRIES) as TOTAL_ENT from entries group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
 
-ID          UNIT        STATION          LINENAME     TOTAL_ENTRIES
-----------  ----------  ---------------  -----------  -------------
-635141      R011        42 ST-PA BUS TE  ACENQRS1237  7515283142   
-586808      R080        57 ST-7 AVE      NQR          7322653178   
-714660      R084        59 ST-COLUMBUS   1ABCD        4287013743   
-713284      R033        42 ST-TIMES SQ   1237ACENQRS  3833759862   
-726965      R044        BROOKLYN BRIDGE  456JZ        3689538466   
-705651      R028        FULTON ST        2345ACJZ     3335250387   
-680062      R453        23 ST-6 AVE      FM           3079427013   
-729663      R131        23 ST            6            3071870495   
-773955      R110        FLATBUSH AVE     25           2958008384   
-716443      R452        72 ST            123          2829892542  
+ID          UNIT        STATION       LINENAME    TOTAL_ENTRIES
+----------  ----------  ------------  ----------  -------------
+728605      R170        14 ST-UNION   456LNQR     2675454      
+733260      R046        42 ST-GRD CN  4567S       1789939      
+679390      R022        34 ST-HERALD  BDFMNQR     1732995      
+714660      R084        59 ST-COLUMB  1ABCD       1729229      
+713284      R033        42 ST-TIMES   1237ACENQR  1584018      
+637233      R012        34 ST-PENN S  ACE         1563049      
+738398      R179        86 ST         456         1562741      
+765251      R055        MAIN ST       7           1525426      
+711512      R293        34 ST-PENN S  123ACE      1356457      
+635141      R011        42 ST-PA BUS  ACENQRS123  1342426 
 ```
 
 ### Top 10 Stations on the 1 line
 
-42nd st wins by a huge margin. Not sure how different 42 ST- PA BUS is from 42 ST- TIMES SQ. Considering consolidating them.
+> select UNIT, STATION,LINENAME,ts.TOTAL_ENT as TOTAL_ENTRIES,ts.TOTAL_EX as TOTAL_EXITS from (select *,SUM(EXITS) as TOTAL_EX,SUM(ENTRIES) as TOTAL_ENT from entries where instr(LINENAME, '1') group by UNIT) ts order by TOTAL_ENTRIES DESC limit 10;
+
+42nd st wins by a huge margin if you group them all up. Not sure how different 42 ST- PA BUS is from 42 ST- TIMES SQ. Considering consolidating them.
 
 ```
-UNIT        STATION          LINENAME     TOTAL_ENTRIES  TOTAL_EXITS
-----------  ---------------  -----------  -------------  -----------
-R011        42 ST-PA BUS TE  ACENQRS1237  7515283142     6224158924 
-R084        59 ST-COLUMBUS   1ABCD        4287013743     4811284800 
-R033        42 ST-TIMES SQ   1237ACENQRS  3833759862     3280405602 
-R452        72 ST            123          2829892542     2907651868 
-R030        CHAMBERS ST      123          2178364226     1773333113 
-R189        CHRISTOPHER ST   1            1920636346     738990120  
-R032        42 ST-TIMES SQ   1237ACENQRS  1870596495     1218086552 
-R105        14 ST            123FLM       1496914943     1593372963 
-R273        145 ST           1            1358092539     1976354079 
-R159        116 ST-COLUMBIA  1            1207900247     255070842 
+UNIT        STATION         LINENAME    TOTAL_ENTRIES  TOTAL_EXITS
+----------  --------------  ----------  -------------  -----------
+R084        59 ST-COLUMBUS  1ABCD       1729229        1362474    
+R033        42 ST-TIMES SQ  1237ACENQR  1584018        1054274    
+R293        34 ST-PENN STA  123ACE      1356457        923180     
+R011        42 ST-PA BUS T  ACENQRS123  1342426        1116910    
+R540        PATH WTC 2      1           1105583        1102541    
+R168        96 ST           123         975422         917591     
+R452        72 ST           123         975304         834867     
+R010        42 ST-PA BUS T  ACENQRS123  931452         735392     
+R032        42 ST-TIMES SQ  1237ACENQR  878550         1219331    
+R541        THIRTY THIRD S  1           790941         719161     
+R031        34 ST-PENN STA  123         711135         794023     
+R001        SOUTH FERRY     1R          691317         664513  
 ```
 
 ### Stations on the G line, in order of decresing popularity
@@ -81,29 +89,29 @@ The '7' exclusion is there to filter out the weird 42nd st stop that apparently 
 
 > select UNIT, STATION,LINENAME,ts.TOTAL_ENT as TOTAL_ENTRIES,ts.TOTAL_EX as TOTAL_EXITS from (select *,SUM(EXITS) as TOTAL_EX,SUM(ENTRIES) as TOTAL_ENT from entries where instr(LINENAME, 'G') and not instr(LINENAME, '7')  group by UNIT) ts order by TOTAL_ENTRIES DESC limit 30;
 
-UNIT        STATION     LINENAME    TOTAL_ENTRIES  TOTAL_EXITS
-----------  ----------  ----------  -------------  -----------
-R359        COURT SQ    EMG         248900062      18377314   
-R256        NASSAU AV   G           178524401      57885167   
-R269        BEDFORD/NO  G           172430677      50741833   
-R204        CHURCH AVE  FG          166686368      41822070   
-R258        4 AVE       DFGMNR      52380918       38808209   
-R220        CARROLL ST  FG          42016153       24971189   
-R268        METROPOLIT  GL          39410701       25254671   
-R129        BERGEN ST   FG          36063923       22484146   
-R217        HOYT/SCHER  ACG         29809049       30488426   
-R288        7 AV-PARK   FG          25362691       7996743    
-R317        CLINTON-WA  G           19619335       4252381    
-R286        MYRTLE-WIL  G           19350748       12598318   
-R241        15 ST-PROS  FG          18728069       8269590    
-R299        BROADWAY    G           14289913       10596625   
-R287        CLASSON AV  G           13911699       13593579   
-R239        GREENPOINT  G           13700077       8417595    
-R318        FULTON ST   G           12306053       12674774   
-R289        FT HAMILTO  FG          10381010       3556658    
-R270        SMITH-9 ST  FG          10210066       7663262    
-R316        FLUSHING A  G           7076375        6954122    
-R360        VAN ALSTON  G           5435475        6156631
+UNIT        STATION          LINENAME    TOTAL_ENTRIES  TOTAL_EXITS
+----------  ---------------  ----------  -------------  -----------
+R268        METROPOLITAN AV  GL          406604         204217     
+R359        COURT SQ         EMG         393372         206356     
+R258        4 AVE            DFGMNR      317127         285127     
+R288        7 AV-PARK SLOPE  FG          272005         60317      
+R204        CHURCH AVE       FG          270687         169046     
+R129        BERGEN ST        FG          270588         166326     
+R220        CARROLL ST       FG          268265         121279     
+R217        HOYT/SCHERMER    ACG         240597         213857     
+R256        NASSAU AV        G           218548         113352     
+R239        GREENPOINT AVE   G           218107         155785     
+R269        BEDFORD/NOSTRAN  G           198039         110727     
+R241        15 ST-PROSPECT   FG          146397         63455      
+R286        MYRTLE-WILLOUGH  G           144565         79652      
+R289        FT HAMILTON PKY  FG          134171         38559      
+R317        CLINTON-WASH AV  G           132916         19985      
+R270        SMITH-9 ST       FG          126743         142212     
+R287        CLASSON AVE      G           122914         116782     
+R318        FULTON ST        G           114912         110825     
+R299        BROADWAY         G           102202         85013      
+R316        FLUSHING AVE     G           64595          64798      
+R360        VAN ALSTON-21ST  G           45890          50158    
 ```
 
 ### Find total by turnstile
@@ -113,11 +121,16 @@ R360        VAN ALSTON  G           5435475        6156631
 
 ID          SCP         UNIT        STATION     TOTAL_ENTRIES
 ----------  ----------  ----------  ----------  -------------
-614657      00-00-00    R248        1 AVE       10173346     
-614699      00-00-01    R248        1 AVE       54404349     
-614741      00-03-00    R248        1 AVE       369340725    
-614783      00-03-01    R248        1 AVE       1405477      
-614825      00-03-02    R248        1 AVE       4819128 
+614657      00-00-00    R248        1 AVE       101605       
+614699      00-00-01    R248        1 AVE       135648       
+614741      00-03-00    R248        1 AVE       24617        
+614783      00-03-01    R248        1 AVE       21122        
+614825      00-03-02    R248        1 AVE       34352        
+614867      01-00-00    R248        1 AVE       7640         
+614909      01-00-01    R248        1 AVE       20672        
+614951      01-00-02    R248        1 AVE       42245        
+614993      01-00-03    R248        1 AVE       80192        
+615035      01-00-04    R248        1 AVE       121564 
 ```
 
 ### Find total for one station
@@ -127,7 +140,7 @@ ID          SCP         UNIT        STATION     TOTAL_ENTRIES
 
 ID          UNIT        STATION         TOTAL_ENTRIES
 ----------  ----------  --------------  -------------
-728605      R170        14 ST-UNION SQ  1310473486 
+728605      R170        14 ST-UNION SQ  2675454 
 ```
 
 

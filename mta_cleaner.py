@@ -140,7 +140,7 @@ def remove_outliers(rows):
 
 
 def is_outlier(mean, std, val):
-    magnitude = 8
+    magnitude = 5
     return abs(mean - val) > std*magnitude
 
 
@@ -178,7 +178,7 @@ def open_db(dbname):
     global connection, cursor
     connection = sqlite3.connect(dbname)
     cursor = connection.cursor()
-    return True
+    return connection
 
 
 def test():
