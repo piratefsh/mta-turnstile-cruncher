@@ -45,11 +45,11 @@ Get for each station, entries and exits for each date in JSON format:
 
 import sqlite3
 import json
+import sys
 
 # get data from db
-connection = sqlite3.connect(
-    '../mta-turnstile-cruncher/db/mta-2015-09-clean.db')
-cursor = connection.cursor()
+connection = None 
+cursor = None
 
 def data_to_json(date_range=None):
     # get all stations
@@ -57,6 +57,7 @@ def data_to_json(date_range=None):
 
     stations_data = dict()
     # for each station, get total per time frame
+
     for unit, in stations:
         print(unit, end=', ')
         if not unit:
@@ -76,11 +77,16 @@ def data_to_json(date_range=None):
         stations_data[unit] = s
 
     start, end = date_range
+    max_ent, max_ext = get_max(date_range)
     data = {
         'stations' : stations_data,
         'date_range': {
             'start': start,
             'end' : end
+        },
+        'max': {
+            'entries': max_ent,
+            'exits': max_ext
         }
     }
 
@@ -117,6 +123,13 @@ def get_numbers_by_date_time(unit, dates=None):
 
     return dates 
 
+def get_max(datetime):
+    start, end = datetime
+    query = 'select max(ENTRIES), max(EXITS) from entries where\
+        datetime(DATETIME) between datetime("%s") and datetime("%s")' % (start, end)
+    res = cursor.execute(query).fetchone()
+    return res
+    
 def get_metadata(unit):
     query = "select STATION, count(distinct SCP), sum(ENTRIES), sum(EXITS) from entries where UNIT=?"
     res = cursor.execute(query, (unit,)).fetchone()
@@ -129,13 +142,25 @@ def get_stations():
     stations = cursor.execute(query).fetchall()
     return stations
 
-def test(filename, dates):
-    res = get_numbers_by_date_time('R170', ('2015-09-09', '2015-09-10')) 
-
+def extract(filename, dates):
     d = data_to_json(date_range=dates)
     
     with open(filename, 'w') as f:
         f.write(json.dumps(d, sort_keys=True, indent=2))
         f.close()
 
+def main():
+    global connection, cursor
+    if(len(sys.argv) != 5):
+        print('Usage: python mta_api <db name> <start date: YYYY-MM-DD> <end date: YYYY-MM-DD> <filename>')
+        return
+    dbname = sys.argv[1]
+    start = sys.argv[2]
+    end = sys.argv[3]
+    filename = sys.argv[4]
+    connection = sqlite3.connect(dbname)
+    cursor = connection.cursor()
+
+    extract(filename, (start, end))
+main()
 
